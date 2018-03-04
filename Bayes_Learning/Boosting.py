@@ -4,15 +4,15 @@
 # # Lab 3: Bayes Classifier and Boosting
 
 # ## Jupyter notebooks
-# 
+#
 # In this lab, you can use Jupyter <https://jupyter.org/> to get a nice layout of your code and plots in one document. However, you may also use Python as usual, without Jupyter.
-# 
+#
 # If you have Python and pip, you can install Jupyter with `sudo pip install jupyter`. Otherwise you can follow the instruction on <http://jupyter.readthedocs.org/en/latest/install.html>.
-# 
+#
 # And that is everything you need! Now use a terminal to go into the folder with the provided lab files. Then run `jupyter notebook` to start a session in that folder. Click `lab3.ipynb` in the browser window that appeared to start this very notebook. You should click on the cells in order and either press `ctrl+enter` or `run cell` in the toolbar above to evaluate all the expressions.
 
 # ## Import the libraries
-# 
+#
 # In Jupyter, select the cell below and press `ctrl + enter` to import the needed libraries.
 # Check out `labfuns.py` if you are interested in the details.
 
@@ -24,7 +24,7 @@ import random
 
 
 # ## Bayes classifier functions to implement
-# 
+#
 # The lab descriptions state what each function should do.
 # NOTE: you do not need to handle the W argument for this part!
 # in: labels - N vector of class labels
@@ -44,8 +44,8 @@ def computePrior(labels, W=None):
     for k in classes:
         for i in range(Npts):
             if labels[i] == k:
-                prior[k] += 1
-        prior[k] /= Npts
+                prior[k] += W[i]
+    prior /= sum(prior)
 
     return prior
 
@@ -72,13 +72,13 @@ def mlParams(X, labels, W=None):
         Nk = 0.0
         for i in range(Npts):
             if labels[i] == k:
-                mu[k] = mu[k] + X[i]
-                Nk += 1.0
+                mu[k] = mu[k] + W[i] * X[i]
+                Nk += W[i]
         mu[k] /= Nk
         for i in range(Npts):
             if labels[i] == k:
                 for j in range(Ndims):
-                    sigma[k][j][j] += np.dot((X[i][j] - mu[k][j]), (X[i][j] - mu[k][j]))
+                    sigma[k][j][j] += W[i] * np.dot((X[i][j] - mu[k][j]), (X[i][j] - mu[k][j]))
         sigma[k] /= Nk
 
     return mu, sigma
@@ -129,7 +129,7 @@ class BayesClassifier(object):
 
 
 # ## Test the Maximum Likelihood estimates
-# 
+#
 # Call `genBlobs` and `plotGaussian` to verify your estimates.
 
 
@@ -142,17 +142,15 @@ plotGaussian(X, labels, mu, sigma)
 
 
 # testClassifier(BayesClassifier(), dataset='iris', split=0.7)
+# plotBoundary(BayesClassifier(), dataset='iris',split=0.7)
 
 
 # testClassifier(BayesClassifier(), dataset='vowel', split=0.8)
-
-
-# plotBoundary(BayesClassifier(), dataset='iris',split=0.7)
-
 # plotBoundary(BayesClassifier(), dataset='vowel',split=0.8)
 
+
 # ## Boosting functions to implement
-# 
+#
 # The lab descriptions state what each function should do.
 
 
@@ -181,8 +179,24 @@ def trainBoost(base_classifier, X, labels, T=10):
 
         # TODO: Fill in the rest, construct the alphas etc.
         # ==========================
+        error = 0.0000001
+        for j in range(Npts):
+            if vote[j] == labels[j]:
+                delta = 1
+            else:
+                delta = 0
+            error += wCur[j] * (1-delta)
+        alpha = np.log((1 - error) / error) / 2
+        delta_judge = np.ones((Npts, 1))
+        for j in range(Npts):
+            if vote[j] == labels[j]:
+                delta_judge[j] = np.exp(-alpha)
+            else:
+                delta_judge[j] = np.exp(alpha)
+        wCur = np.multiply(wCur, np.exp(delta_judge))
+        wCur = wCur / sum(wCur)
 
-        # alphas.append(alpha) # you will need to append the new alpha
+        alphas.append(alpha) # you will need to append the new alpha
         # ==========================
 
     return classifiers, alphas
@@ -206,7 +220,10 @@ def classifyBoost(X, classifiers, alphas, Nclasses):
         # TODO: implement classificiation when we have trained several classifiers!
         # here we can do it by filling in the votes vector with weighted votes
         # ==========================
-
+        for t in range(Ncomps):
+            h = classifiers[t].classify(X)
+            for i in range(Npts):
+                votes[i][h[i]] += alphas[t]
         # ==========================
 
         # one way to compute yPred after accumulating the votes
@@ -234,21 +251,18 @@ class BoostClassifier(object):
         return classifyBoost(X, self.classifiers, self.alphas, self.nbr_classes)
 
 # ## Run some experiments
-# 
+#
 # Call the `testClassifier` and `plotBoundary` functions for this part.
 
 
 # testClassifier(BoostClassifier(BayesClassifier(), T=10), dataset='iris',split=0.7)
-
-
-# testClassifier(BoostClassifier(BayesClassifier(), T=10), dataset='vowel',split=0.7)
-
-
 # plotBoundary(BoostClassifier(BayesClassifier()), dataset='iris',split=0.7)
 
 
-# Now repeat the steps with a decision tree classifier.
+testClassifier(BoostClassifier(BayesClassifier(), T=10), dataset='vowel',split=0.7)
+plotBoundary(BoostClassifier(BayesClassifier()), dataset='vowel',split=0.7)
 
+# Now repeat the steps with a decision tree classifier.
 
 # testClassifier(DecisionTreeClassifier(), dataset='iris', split=0.7)
 
@@ -269,7 +283,7 @@ class BoostClassifier(object):
 
 
 # ## Bonus: Visualize faces classified using boosted decision trees
-# 
+#
 # Note that this part of the assignment is completely voluntary! First, let's check how a boosted decision tree classifier performs on the olivetti data. Note that we need to reduce the dimension a bit using PCA, as the original dimension of the image vectors is `64 x 64 = 4096` elements.
 
 
